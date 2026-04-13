@@ -39,15 +39,10 @@ uploaded = st.sidebar.file_uploader("Upload Dataset Kaggle (creditcard.csv)", ty
 # ===========================================
 # LOAD DATASET
 # ===========================================
-@st.cache_data
-def load_data(file):
-    return pd.read_csv(file, nrows=50000)  # ambil sebagian data saja
-
-if uploaded is not None:
-    df = load_data(uploaded)
+if uploaded:
+    df = pd.read_csv(uploaded)
 else:
-    st.warning("Upload dataset terlebih dahulu.")
-    st.stop()
+    df = None
 
 
 # ===========================================
