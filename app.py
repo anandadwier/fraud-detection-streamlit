@@ -50,7 +50,7 @@ def load_uploaded(file):
 
 @st.cache_data
 def load_from_drive():
-    url = "https://drive.google.com/uc?id=YOUR_FILE_ID"
+    url = "https://drive.google.com/uc?id=14sWvnvXqIjmS2adjCIrVf--2ld6NXVWJ"
     return pd.read_csv(url)
 
 df = None
@@ -90,6 +90,7 @@ if menu == "Home":
     - Evaluasi model
     - Prediksi transaksi
     """)
+    st.info("Silakan upload dataset melalui sidebar untuk mulai menggunakan aplikasi.")
 
 
 # ===========================================
