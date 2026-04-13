@@ -1,289 +1,284 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
-
+import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    roc_auc_score,
+    roc_curve,
+)
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    confusion_matrix, classification_report,
-    roc_curve, auc, accuracy_score, precision_score,
-    recall_score, f1_score, roc_auc_score
+
+# ============================================
+#   STREAMLIT — TTU 1 VERSION (SESUAI SKRIPSI)
+# ============================================
+st.set_page_config(page_title="Fraud Detection TTU 1", layout="wide")
+
+# -------- STYLE --------
+st.markdown(
+    """
+    <style>
+        .stApp { background-color: #f6f7fa; }
+        h1, h2, h3 { color: #0b4a83; }
+        .stButton>button { background-color: #0b4a83 !important; color: white !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-# ===========================================
-# KONFIGURASI STREAMLIT
-# ===========================================
-st.set_page_config(
-    page_title="Credit Card Fraud Detection",
-    layout="wide"
+# -------- SIDEBAR --------
+st.sidebar.title("Navigasi")
+menu = st.sidebar.radio(
+    "Pilih Halaman",
+    ["Upload Dataset", "Preprocessing & Training", "Evaluasi", "Perbandingan Model", "Feature Importance", "Tentang"],
 )
 
-st.title("💳 Deteksi Penipuan Kartu Kredit Berbasis Machine Learning & Streamlit")
+# ============================================
+#   1. UPLOAD DATASET
+# ============================================
+if menu == "Upload Dataset":
+    st.title("📂 Upload Dataset Fraud")
 
+    data_file = st.file_uploader("Upload file CSV Fraud Kaggle", type=["csv"])
 
-# ===========================================
-# SIDEBAR MENU
-# ===========================================
-menu = st.sidebar.selectbox(
-    "Navigasi",
-    ["Home", "Exploratory Data Analysis (EDA)", "Training Model", "Model Comparison", "Predict New Transaction"]
-)
+    if data_file:
+        df = pd.read_csv(data_file)
+        st.session_state["df"] = df
 
-uploaded = st.sidebar.file_uploader("Upload Dataset Kaggle (creditcard.csv)", type=["csv"])
-
-
-# ===========================================
-# LOAD DATASET
-# ===========================================
-if uploaded:
-    df = pd.read_csv(uploaded)
-else:
-    df = None
-
-
-# ===========================================
-# HOME
-# ===========================================
-if menu == "Home":
-    st.subheader("📌 Deskripsi Aplikasi")
-    st.write("""
-    Aplikasi ini merupakan implementasi akhir dari deteksi penipuan kartu kredit menggunakan algoritma 
-    **Decision Tree** dan **Random Forest**, dilengkapi visualisasi interaktif Streamlit.
-
-    Fitur Utama:
-    - Upload dataset Kaggle
-    - Visualisasi EDA (Histogram, Correlation Heatmap)
-    - Training model ML (DT & RF)
-    - Visualisasi Confusion Matrix & ROC Curve
-    - Perbandingan model lengkap (Accuracy, Precision, Recall, F1, ROC-AUC)
-    - Prediksi transaksi baru secara realtime
-    """)
-
-    st.info("Silakan upload dataset melalui sidebar untuk mulai menggunakan aplikasi.")
-
-
-# ===========================================
-# EDA
-# ===========================================
-elif menu == "Exploratory Data Analysis (EDA)":
-    if df is None:
-        st.warning("Upload dataset terlebih dahulu.")
-    else:
-        st.subheader("📊 Exploratory Data Analysis (EDA)")
-        st.write("Dataset 5 baris pertama:")
+        st.success("Dataset berhasil dimuat!")
         st.dataframe(df.head())
 
-        # Drop Time jika ada
-        if "Time" in df.columns:
-            df = df.drop(columns=["Time"])
+        st.subheader("Statistik Data")
+        st.dataframe(df.describe().T)
 
-        # Histogram Amount
-        st.subheader("📈 Distribusi Amount")
-        fig, ax = plt.subplots()
-        sns.histplot(df["Amount"], kde=True, ax=ax)
-        st.pyplot(fig)
+# ============================================
+#   2. PREPROCESSING & TRAINING
+# ============================================
+if menu == "Preprocessing & Training":
+    st.title("🛠 Preprocessing & Training Model")
 
-        # Correlation heatmap
-        st.subheader("🔍 Correlation Heatmap")
-        fig2, ax2 = plt.subplots(figsize=(10, 6))
-        sns.heatmap(df.corr(), cmap="coolwarm", ax=ax2)
-        st.pyplot(fig2)
-
-
-# ===========================================
-# TRAINING MODEL
-# ===========================================
-elif menu == "Training Model":
-    if df is None:
+    if "df" not in st.session_state:
         st.warning("Upload dataset terlebih dahulu.")
-    else:
-        st.subheader("🧠 Training Model Machine Learning")
+        st.stop()
 
-        # Preprocessing
-        df = df.drop_duplicates()
-        if "Time" in df.columns:
-            df = df.drop(columns=["Time"])
+    df = st.session_state["df"].copy()
 
-        df["Amount"] = (df["Amount"] - df["Amount"].mean()) / df["Amount"].std()
+    st.subheader("Preprocessing otomatis sesuai TTU 1:")
+    st.markdown(
+        """
+        - Menghapus kolom **Time** (tidak digunakan dalam modeling)
+        - Normalisasi **Amount** menggunakan Z-Score
+        - Target tetap: **Class**
+        - Semua fitur numerik digunakan otomatis
+        """
+    )
 
-        X = df.drop(columns=["Class"])
-        y = df["Class"]
+    # Drop Time jika ada
+    if "Time" in df.columns:
+        df = df.drop(columns=["Time"])
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, stratify=y, random_state=42
-        )
+    # Normalisasi Amount
+    if "Amount" in df.columns:
+        scaler_amount = StandardScaler()
+        df["Amount"] = scaler_amount.fit_transform(df[["Amount"]])
+        st.session_state["scaler_amount"] = scaler_amount
 
-        model_choice = st.selectbox("Pilih Algoritma", ["Decision Tree", "Random Forest"])
+    # Fitur & Target
+    X = df.drop(columns=["Class"])
+    y = df["Class"]
 
-        if model_choice == "Decision Tree":
+    # Train-test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    # Scaling seluruh fitur
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    st.session_state["X_train"] = X_train
+    st.session_state["X_test"] = X_test
+    st.session_state["y_train"] = y_train
+    st.session_state["y_test"] = y_test
+    st.session_state["scaler_features"] = scaler
+
+    st.success("Preprocessing selesai!")
+
+    st.subheader("Pilih Model untuk Training")
+    model_name = st.selectbox("Model", ["Decision Tree", "Random Forest"])
+
+    if st.button("🚀 Train Model"):
+        if model_name == "Decision Tree":
             model = DecisionTreeClassifier(random_state=42)
         else:
-            model = RandomForestClassifier(n_estimators=100, random_state=42)
+            model = RandomForestClassifier(n_estimators=150, random_state=42)
 
         model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-        y_prob = model.predict_proba(X_test)[:, 1]
 
+        st.session_state["model"] = model
         st.success("Model berhasil dilatih!")
 
-        # Classification report
-        st.subheader("📄 Classification Report")
-        report = classification_report(y_test, y_pred, output_dict=True)
-        st.dataframe(pd.DataFrame(report))
+# ============================================
+#   3. EVALUASI MODEL
+# ============================================
+if menu == "Evaluasi":
+    st.title("📊 Evaluasi Model Fraud Detection")
 
-        # Confusion Matrix
-        st.subheader("📉 Confusion Matrix")
-        cm = confusion_matrix(y_test, y_pred)
-        fig_cm, ax_cm = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax_cm)
-        st.pyplot(fig_cm)
+    if "model" not in st.session_state:
+        st.warning("Model belum dilatih.")
+        st.stop()
 
-        # ROC Curve
-        st.subheader("📈 ROC Curve")
-        fpr, tpr, _ = roc_curve(y_test, y_prob)
-        roc_auc = auc(fpr, tpr)
+    model = st.session_state["model"]
+    X_test = st.session_state["X_test"]
+    y_test = st.session_state["y_test"]
 
-        fig_roc, ax_roc = plt.subplots()
-        ax_roc.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
-        ax_roc.plot([0, 1], [0, 1], linestyle="--")
-        ax_roc.set_xlabel("False Positive Rate")
-        ax_roc.set_ylabel("True Positive Rate")
-        ax_roc.legend()
-        st.pyplot(fig_roc)
+    preds = model.predict(X_test)
+    probs = model.predict_proba(X_test)[:, 1]
 
-        # Feature Importance
-        st.subheader("🔍 Feature Importance")
-        importance = pd.DataFrame({
-            "feature": X.columns,
-            "importance": model.feature_importances_
-        }).sort_values(by="importance", ascending=False)
+    st.subheader("Akurasi & Classification Report")
+    st.write("Accuracy:", accuracy_score(y_test, preds))
+    st.text(classification_report(y_test, preds))
 
-        st.bar_chart(importance.set_index("feature"))
+    st.subheader("Confusion Matrix")
+    cm = confusion_matrix(y_test, preds)
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+    st.pyplot(fig)
 
+    st.subheader("ROC Curve & AUC Score")
+    fpr, tpr, _ = roc_curve(y_test, probs)
+    auc = roc_auc_score(y_test, probs)
 
-# ===========================================
-# MODEL COMPARISON (Fitur Jawaban Rumusan Masalah 2)
-# ===========================================
-elif menu == "Model Comparison":
-    if df is None:
+    fig2, ax2 = plt.subplots()
+    ax2.plot(fpr, tpr, label=f"AUC = {auc:.4f}")
+    ax2.plot([0, 1], [0, 1], "r--")
+    ax2.set_xlabel("False Positive Rate")
+    ax2.set_ylabel("True Positive Rate")
+    ax2.legend()
+
+    st.pyplot(fig2)
+
+# ============================================
+#   4. PERBANDINGAN MODEL
+# ============================================
+if menu == "Perbandingan Model":
+    st.title("📊 Perbandingan Decision Tree vs Random Forest")
+
+    if "df" not in st.session_state:
         st.warning("Upload dataset terlebih dahulu.")
-    else:
-        st.subheader("⚖️ Perbandingan Kinerja Decision Tree vs Random Forest")
+        st.stop()
 
-        # Preprocessing
-        df = df.drop_duplicates()
-        if "Time" in df.columns:
-            df = df.drop(columns=["Time"])
+    df = st.session_state["df"].copy()
 
-        df["Amount"] = (df["Amount"] - df["Amount"].mean()) / df["Amount"].std()
+    # Preprocessing minimal
+    if "Time" in df.columns:
+        df = df.drop(columns=["Time"])
+    if "Amount" in df.columns:
+        scaler_amount = StandardScaler()
+        df["Amount"] = scaler_amount.fit_transform(df[["Amount"]])
 
-        X = df.drop(columns=["Class"])
-        y = df["Class"]
+    X = df.drop(columns=["Class"]).select_dtypes(include=[np.number])
+    y = df["Class"]
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, stratify=y, random_state=42
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s = scaler.transform(X_test)
+
+    # Train kedua model
+    dt = DecisionTreeClassifier(random_state=42)
+    rf = RandomForestClassifier(n_estimators=150, random_state=42)
+
+    dt.fit(X_train_s, y_train)
+    rf.fit(X_train_s, y_train)
+
+    dt_pred = dt.predict(X_test_s)
+    rf_pred = rf.predict(X_test_s)
+
+    dt_prob = dt.predict_proba(X_test_s)[:,1]
+    rf_prob = rf.predict_proba(X_test_s)[:,1]
+
+    # Tabel perbandingan
+    comparison = pd.DataFrame({
+        "Model": ["Decision Tree", "Random Forest"],
+        "Accuracy": [accuracy_score(y_test, dt_pred), accuracy_score(y_test, rf_pred)],
+        "Precision": [classification_report(y_test, dt_pred, output_dict=True)["1"]["precision"],
+                       classification_report(y_test, rf_pred, output_dict=True)["1"]["precision"]],
+        "Recall": [classification_report(y_test, dt_pred, output_dict=True)["1"]["recall"],
+                    classification_report(y_test, rf_pred, output_dict=True)["1"]["recall"]],
+        "F1-Score": [classification_report(y_test, dt_pred, output_dict=True)["1"]["f1-score"],
+                      classification_report(y_test, rf_pred, output_dict=True)["1"]["f1-score"]],
+        "ROC-AUC": [roc_auc_score(y_test, dt_prob), roc_auc_score(y_test, rf_prob)]
+    })
+
+    st.subheader("📌 Hasil Perbandingan Model")
+    st.dataframe(comparison)
+
+    st.subheader("📈 Kesimpulan Analisis")
+    st.markdown("""
+    **Random Forest** hampir selalu lebih unggul karena:
+    - Menggunakan ratusan pohon (bagging) → lebih stabil
+    - Risiko overfitting lebih kecil daripada Decision Tree
+    - Bias lebih rendah & akurasi umumnya lebih tinggi
+
+    **Decision Tree** tetap berguna bila:
+    - Butuh model cepat dan mudah dipahami
+    - Ingin interpretasi sederhana
+    """)
+
+# ============================================
+#   5. FEATURE IMPORTANCE
+# ============================================
+if menu == "Feature Importance":
+    st.title("🌲 Feature Importance (RF / DT)")
+
+    if "model" not in st.session_state:
+        st.warning("Model belum dilatih.")
+        st.stop()
+
+    model = st.session_state["model"]
+    df = st.session_state["df"].copy()
+
+    X_cols = df.drop(columns=["Class"]).columns
+
+    if hasattr(model, "feature_importances_"):
+        fi = model.feature_importances_
+        fi_df = pd.DataFrame({"Feature": X_cols, "Importance": fi}).sort_values(
+            "Importance", ascending=False
         )
 
-        # Train kedua model
-        dt = DecisionTreeClassifier(random_state=42)
-        rf = RandomForestClassifier(n_estimators=100, random_state=42)
+        st.dataframe(fi_df.head(20))
 
-        dt.fit(X_train, y_train)
-        rf.fit(X_train, y_train)
-
-        dt_pred = dt.predict(X_test)
-        rf_pred = rf.predict(X_test)
-
-        dt_prob = dt.predict_proba(X_test)[:, 1]
-        rf_prob = rf.predict_proba(X_test)[:, 1]
-
-        # ================================
-        # METRICS PERBANDINGAN
-        # ================================
-        results = pd.DataFrame({
-            "Model": ["Decision Tree", "Random Forest"],
-            "Accuracy": [
-                accuracy_score(y_test, dt_pred),
-                accuracy_score(y_test, rf_pred)
-            ],
-            "Precision": [
-                precision_score(y_test, dt_pred),
-                precision_score(y_test, rf_pred)
-            ],
-            "Recall": [
-                recall_score(y_test, dt_pred),
-                recall_score(y_test, rf_pred)
-            ],
-            "F1-score": [
-                f1_score(y_test, dt_pred),
-                f1_score(y_test, rf_pred)
-            ],
-            "ROC-AUC": [
-                roc_auc_score(y_test, dt_prob),
-                roc_auc_score(y_test, rf_prob)
-            ]
-        })
-
-        st.subheader("📄 Tabel Perbandingan Model")
-        st.dataframe(results)
-
-        best_model_name = results.loc[results["ROC-AUC"].idxmax(), "Model"]
-        st.success(f"🏆 **Model Terbaik Berdasarkan Evaluasi adalah: {best_model_name}**")
-
-        st.subheader("📊 Visualisasi Perbandingan")
-        st.bar_chart(results.set_index("Model")[["Accuracy", "Precision", "Recall", "F1-score", "ROC-AUC"]])
-
-        # ROC Curve comparison
-        st.subheader("📈 ROC Curve Comparison")
-        fpr_dt, tpr_dt, _ = roc_curve(y_test, dt_prob)
-        fpr_rf, tpr_rf, _ = roc_curve(y_test, rf_prob)
-
-        fig, ax = plt.subplots()
-        ax.plot(fpr_dt, tpr_dt, label=f"Decision Tree (AUC = {roc_auc_score(y_test, dt_prob):.4f})")
-        ax.plot(fpr_rf, tpr_rf, label=f"Random Forest (AUC = {roc_auc_score(y_test, rf_prob):.4f})")
-        ax.plot([0, 1], [0, 1], linestyle="--")
-        ax.set_xlabel("False Positive Rate")
-        ax.set_ylabel("True Positive Rate")
-        ax.legend()
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.barplot(data=fi_df.head(15), x="Importance", y="Feature", ax=ax)
         st.pyplot(fig)
-
-
-# ===========================================
-# PREDIKSI TRANSAKSI BARU
-# ===========================================
-elif menu == "Predict New Transaction":
-    if df is None:
-        st.warning("Upload dataset terlebih dahulu.")
     else:
-        st.subheader("🟦 Prediksi Transaksi Baru")
+        st.info("Model tidak mendukung feature importance.")
 
-        df = df.drop_duplicates()
-        if "Time" in df.columns:
-            df = df.drop(columns=["Time"])
+# ============================================
+#   6. TENTANG
+# ============================================
+if menu == "Tentang":
+    st.title("Tentang Aplikasi")
+    st.markdown(
+        """
+        Aplikasi ini dibuat **khusus untuk skripsi TTU 1** menggunakan dataset Credit Card Fraud Kaggle.
 
-        df["Amount"] = (df["Amount"] - df["Amount"].mean()) / df["Amount"].std()
-
-        X = df.drop(columns=["Class"])
-        y = df["Class"]
-
-        model = RandomForestClassifier(n_estimators=100, random_state=42)
-        model.fit(X, y)
-
-        st.info("Masukkan nilai fitur transaksi untuk diprediksi:")
-
-        input_data = {}
-        for col in X.columns:
-            input_data[col] = st.number_input(col, value=float(df[col].mean()))
-
-        input_df = pd.DataFrame([input_data])
-        prediction = model.predict(input_df)[0]
-
-        if st.button("Prediksi"):
-            if prediction == 1:
-                st.error("⚠️ Transaksi Ini Diduga Penipuan (FRAUD)")
-            else:
-                st.success("✔️ Transaksi Aman / Normal")
+        Fitur utama:
+        - Upload dataset
+        - Preprocessing otomatis sesuai metodologi TTU 1
+        - Training Decision Tree & Random Forest
+        - Evaluasi lengkap (Accuracy, Report, Confusion Matrix, ROC AUC)
+        - Feature Importance
+        """
+    )
