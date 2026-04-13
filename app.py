@@ -60,7 +60,18 @@ if df is None:
 # ===========================================
 if menu == "Home":
     st.subheader("📌 Deskripsi Aplikasi")
-    st.write("Aplikasi deteksi fraud menggunakan Decision Tree & Random Forest.")
+    st.write("""
+    Aplikasi ini merupakan implementasi akhir dari deteksi penipuan kartu kredit menggunakan algoritma 
+    **Decision Tree** dan **Random Forest**, dilengkapi visualisasi interaktif Streamlit.
+
+    Fitur Utama:
+    - Upload dataset Kaggle
+    - Visualisasi EDA (Histogram, Correlation Heatmap)
+    - Training model ML (DT & RF)
+    - Visualisasi Confusion Matrix & ROC Curve
+    - Perbandingan model lengkap (Accuracy, Precision, Recall, F1, ROC-AUC)
+    - Prediksi transaksi baru secara realtime
+    """)
 
 # ===========================================
 # EDA
